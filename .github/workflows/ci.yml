@@ -1,0 +1,67 @@
+# CI pipeline
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: write
+
+# Chechout code, Configure AWS credentials (OIDC), Login to ECR, Build and push vote image, result image and worker image, Update image tags in voting-k8s repo
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::098567765340:role/voting-app-github-actions-role
+          aws-region: ap-south-1
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push vote image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/voting-vote:$IMAGE_TAG ./vote
+          docker push $ECR_REGISTRY/voting-vote:$IMAGE_TAG
+
+      - name: Build and push result image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/voting-result:$IMAGE_TAG ./result
+          docker push $ECR_REGISTRY/voting-result:$IMAGE_TAG
+          
+
+      - name: Build and push worker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/voting-worker:$IMAGE_TAG ./worker
+          docker push $ECR_REGISTRY/voting-worker:$IMAGE_TAG
+          
+
+      - name: Update image tags in voting-k8s
+        run: |
+          git clone https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/Vismaya582/voting-k8s.git
+          cd voting-k8s
+          sed -i "s|tag: .*|tag: ${{ github.sha }}|g" charts/voting-app/values.yaml
+          git config user.email "ci@github.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "update image tags to ${{ github.sha }}"
+          git push

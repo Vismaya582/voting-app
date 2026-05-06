@@ -2,3 +2,6 @@
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
+package-lock.json
+package.json
+server.js

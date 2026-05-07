@@ -1,4 +1,4 @@
-# Project 2 — Docker Example Voting App on AWS EKS
+# Voting App on AWS EKS
 
 ## Overview
 
